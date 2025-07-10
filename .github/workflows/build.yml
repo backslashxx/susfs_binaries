@@ -1,0 +1,47 @@
+name: build susfs_userspace
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: grab ndk
+        run: |
+          curl -L https://dl.google.com/android/repository/android-ndk-r23b-linux.zip -o ndk-linux.zip
+          unzip ndk-linux.zip
+
+      - name: grab zig
+        run: |
+          curl -L https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz -o zig.tar.xz
+          tar -xf zig.tar.xz
+          mv zig-* zig
+
+      - name: grab sstrip from ELFkickers
+        run: |
+          curl -L https://www.muppetlabs.com/~breadbox/pub/software/ELFkickers-3.2.tar.gz -o sstrip.tar.gz
+          tar xf sstrip.tar.gz
+          make -C ELFkickers-3.2 sstrip
+          cp ELFkickers-3.2/sstrip/sstrip .
+
+      - name: compile via zigcc
+        run: |
+          ls -la ; pwd
+          echo "for now only aarch64 is built"
+          chmod +x sstrip
+          ./zig/zig cc -target aarch64-linux -s -Oz susfs_155/ksu_susfs.c -static -s -Wl,--gc-sections -o ksu_susfs -I ./android-ndk-r23b/toolchains/llvm/prebuilt/linux-x86_64/sysroot/usr/include
+          upx --ultra-brute ksu_susfs
+          ./sstrip ksu_susfs
+          mkdir binaries
+          mv ksu_susfs binaries/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: susfs_binaries
+          path: binaries/
+
